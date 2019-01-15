@@ -5,6 +5,18 @@ Run /simulation/main.m to compute trajectory tracking simulation.
 
 Reference path is designed in /path_design/path_design.m using spline from used-defined reference points.
 
+・MPC
+
+![mpc](https://raw.github.com/wiki/TakaHoribe/trajectory_tracking_simulation/images/mpc.gif)
+
+・PID
+
+![pid](https://raw.github.com/wiki/TakaHoribe/trajectory_tracking_simulation/images/pid.gif)
+
+・pure pursuit
+
+![purepursuit](https://raw.github.com/wiki/TakaHoribe/trajectory_tracking_simulation/images/purepursuit.gif)
+
 ## Currently available controller
 * pure-pursuit
 * PID
