@@ -1,5 +1,9 @@
-# trajectory_tracking_control
-For developing trajectory tracking algorithm with MATLAB. To see trajectory tracking simulation, run /simulation/main.m. Reference path is designed in /path_design/path_design.m using spline from used-defined reference points.
+# trajectory_tracking_simulation
+For developing trajectory tracking algorithm with MATLAB. 
+
+Run /simulation/main.m to compute trajectory tracking simulation.
+
+Reference path is designed in /path_design/path_design.m using spline from used-defined reference points.
 
 ## Currently available controller
 * pure-pursuit
