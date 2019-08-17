@@ -18,7 +18,7 @@ set(0, 'DefaultAxesLineWidth', 1.0, 'DefaultLineLineWidth', 1.0);
 addpath ../path_design
 
 control_mode_option = ["pure_pursuit", "pid", "mpc", "mpc_no_constraints"];
-control_mode = control_mode_option(2);
+control_mode = control_mode_option(3);
 
 save_video = 0; %1:save, 0:no
 
@@ -33,28 +33,31 @@ simulation_rk4_time_step = 0.002; % simulation time step
 vel_ref = 30 * kmh2ms;
 
 % for dynamics model
-param.tau = 0.115; % steering dynamics: 1d-approximated time constant
+param.tau = 0.27; % steering dynamics: 1d-approximated time constant
 param.wheelbase = 2.69;
 param.steer_lim = 30 * deg2rad;
 param.vel_max = 10;
 param.vel_min = -5;
 
-param.input_delay = 0.05; % [s]
-param.control_dt = 0.01; % [s]
+param.input_delay = 0.24; % [s]
+param.control_dt = 0.03; % [s]
 param.measurement_noise_stddev = [0.1, 0.1, 1.0*deg2rad, 0.5*deg2rad]; % measurement noise
+% param.measurement_noise_stddev = [0,0,0,0]; % measurement noise
 param.steering_steady_state_error_deg = 1;
 
 % for pure pursuit only
 param.pure_pursuit_lookahead = 8.0; % [m]
 
 % for mpc only
-param.mpc_dt = 0.05;
-param.mpc_n = 60;
+param.mpc_dt = 0.1;
+param.mpc_n = 30;
 param.mpc_constraint_steering_deg = 30;
 param.mpc_constraint_steer_rate_deg = 280;
 param.mpc_model_dim = 3;
 param.mpc_Q = diag([1,2]);
 param.mpc_R = 0.5;
+param.mpc_delay_comp_step = round(param.input_delay / param.control_dt);
+% param.mpc_delay_comp_step = 0.0;
 
 % use the input ahead of the delay time
 param.mpc_sensor_delay = param.input_delay; 

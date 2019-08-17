@@ -6,7 +6,16 @@ function [u, debug_info] = model_predictive_controller(state, t, ref, param)
 % 
 % 
 % 
+
+% =================== for delay compensation ==============================
+persistent deltades_buffer
+if isempty(deltades_buffer)
+    deltades_buffer = zeros(param.mpc_delay_comp_step, 1);
+end
+% =========================================================================
+    
 deg2rad = pi / 180;
+delay_step = param.mpc_delay_comp_step;
 
 IDX_X = 1;
 IDX_Y = 2;
@@ -69,13 +78,39 @@ Wex = zeros(DIM_X*mpc_n, 1);
 Cex = zeros(DIM_Y*mpc_n, DIM_X*mpc_n);
 Qex = zeros(DIM_Y*mpc_n, DIM_Y*mpc_n);
 Rex = zeros(DIM_U*mpc_n, DIM_U*mpc_n);
-mpc_ref_v = zeros(length(mpc_n), 1);
-debug_ref_mat = zeros(mpc_n,5);
+mpc_ref_v = zeros(mpc_n + delay_step, 1);
+debug_ref_mat = zeros(mpc_n + delay_step,5);
 
+% =================== for delay compensation ==============================
+% -- apply delay compensation : update dynamics with increasing mpt_t --
+x_curr = x0;
+for i = 1:delay_step
+    if mpc_t > ref(end, IDX_TIME)
+        mpc_t = ref(end, IDX_TIME);
+        disp('[MPC] path is too short to predict dynamics');
+    end
+    ref_now = interp1q(ref(:, IDX_TIME), ref(:,1:5), mpc_t);
+    debug_ref_mat(i,:) = ref_now;
+    v_ = ref_now(IDX_VEL);
+    k_ = ref_now(IDX_CURVATURE);
+    
+    % get discrete state matrix
+    % NOTE : use control_dt as delta time, not mpc_dt. 
+    [Ad, Bd, wd, ~] = get_error_dynamics_state_matrix(param.control_dt, v_, param.wheelbase, param.tau, k_);
+    u_now = deltades_buffer(end - i + 1);
+    x_next = Ad * x_curr + Bd * u_now + wd;
+    
+    mpc_t = mpc_t + param.control_dt; % THIS IS NOT mpc_dt, BUT control_dt
+    x_curr = x_next;
+    
+    mpc_ref_v(i) = v_;
+end
+x0 = x_curr;
+% =========================================================================
 
 % -- mpc matrix for i = 1 --
 ref_i_ = interp1q(ref(:, IDX_TIME), ref(:,1:5), mpc_t);
-debug_ref_mat(1,:) = ref_i_;
+debug_ref_mat(1 + delay_step,:) = ref_i_; % MODIFIED FOR DELAY
 v_ = ref_i_(IDX_VEL);
 k_ = ref_i_(IDX_CURVATURE);
 [Ad, Bd, wd, Cd] = get_error_dynamics_state_matrix(mpc_dt, v_, param.wheelbase, param.tau, k_); 
@@ -86,7 +121,7 @@ Cex(1:DIM_Y, 1:DIM_X) = Cd;
 Qex(1:DIM_Y, 1:DIM_Y) = Q;
 Rex(1:DIM_U, 1:DIM_U) = R;
 
-mpc_ref_v(1) = v_;
+mpc_ref_v(1 + delay_step) = v_;
 
 % -- mpc matrix for i = 2:n --
 for i = 2:mpc_n
@@ -100,7 +135,7 @@ for i = 2:mpc_n
 
     % get reference information
     ref_i_ = interp1q(ref(:, IDX_TIME), ref(:,1:5), mpc_t);
-    debug_ref_mat(i,:) = ref_i_;
+    debug_ref_mat(i + delay_step,:) = ref_i_;
     v_ = ref_i_(IDX_VEL);
     k_ = ref_i_(IDX_CURVATURE);
     
@@ -123,7 +158,7 @@ for i = 2:mpc_n
     Qex(idx_y_i, idx_y_i) = Q;
     Rex(idx_u_i, idx_u_i) = R;
     
-    mpc_ref_v(i) = v_;
+    mpc_ref_v(i + delay_step) = v_;
     
 end
 
@@ -171,10 +206,13 @@ else
     % plot(input_vec); grid on; hold off;
 end
 
-t_mpc = 0:mpc_dt:mpc_dt*mpc_n;
-delta_des = interp1q(t_mpc', input_vec, param.mpc_sensor_delay); % consider time delay
+delta_des = input_vec(1);
 v_des = ref_sp(IDX_VEL);
 u = [v_des, delta_des];
+
+% =================== for delay compensation ==============================
+deltades_buffer = [delta_des; deltades_buffer(1:end-1)];
+% =========================================================================
 
 %% (debug) calculate predicted trajectory 
 
@@ -188,10 +226,12 @@ end
 
 predictd_states_vector = reshape(predictd_states, [], 1);
 
+debug_ref_mat_no_delay_comp = debug_ref_mat(delay_step + 1:end, :);
+
 predicted_error = Aex*x0 + Bex*input_vec + Wex;
 predicted_error = transpose(reshape(predicted_error, 3, []));
-predicted_state_ideal = debug_ref_mat(:,IDX_XY) + ...
-    [-sin(debug_ref_mat(:,IDX_YAW)).*predicted_error(:,1), cos(debug_ref_mat(:,IDX_YAW)).*predicted_error(:,1)];
+predicted_state_ideal = debug_ref_mat_no_delay_comp(:,IDX_XY) + ...
+    [-sin(debug_ref_mat_no_delay_comp(:,IDX_YAW)).*predicted_error(:,1), cos(debug_ref_mat_no_delay_comp(:,IDX_YAW)).*predicted_error(:,1)];
 
 predicted_state_ideal = (reshape(predicted_state_ideal, [], 1));
 
